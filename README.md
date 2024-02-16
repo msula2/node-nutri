@@ -3,7 +3,7 @@
 - Setting up the database:
   - Follow the guidelines provided here for installing Postgresql on linux [over here](https://www.postgresqltutorial.com/postgresql-getting-started/install-postgresql-linux/) till Step 2
   - After installing, follow the following commands:
-    - Run `psql -U postgres` to login with postgres user
+    - Run `sudo -u postgres psql` to login with postgres user
     - Run `CREATE ROLE nutri LOGIN PASSWORD 'dwryhs478';` to create a user called nutri and give it a password
     - Run `CREATE DATABASE nutridb WITH OWNER = nutri;` to create a database called nutri and assign an owner to it
     - Run `psql -h localhost -d nutridb -U nutri -p 5432` to login with user called nutri and connect to database nutridb
