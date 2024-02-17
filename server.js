@@ -1,16 +1,19 @@
 const express = require('express');
 const bodyParser = require('body-parser');
+const cors = require('cors');
 
 const app = express();
 
 app.use(bodyParser.json());
+
+app.use(cors());
 
 const db = require('knex')({
     client: 'pg',
     version: '16.2',
     connection: {
       host : '127.0.0.1',
-      port : 3002,
+      port : 5432,
       user : 'nutri',
       password : 'dwryhs478',
       database : 'nutridb'
@@ -32,17 +35,36 @@ app.post("/register", (req, res) => {
     .catch(err => res.status(400).json(err));  
 });
 
-app.get("/login", (req, res) => {
+app.post("/login", (req, res) => {
   const {username, password} = req.body;
+  console.log("Username:", username, "Password: ", password);
   db('users')
     .where({
       username: username,
       password:  password
-    }).select('id')
+    }).select('id', 'username')
     .then(response => {
-      res.json(response);
+      if (response.length == 0){
+        res.json({
+          result: "failed",
+          error: "Incorrect username/password entered"
+        })
+      }
+      else{
+        res.json({
+          result: "success", 
+          data: response[0]
+        });
+      }
+      
   })
-  .catch(err => res.status(400).json(err));  
+  .catch(err => {
+    console.log(err);
+    res.status(400).json({
+      result: "failed",
+      error: "Error establishing a database connection"
+    })
+  });  
 });
 
 app.listen(3001, () => {
