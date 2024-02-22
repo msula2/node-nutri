@@ -13,10 +13,10 @@ const db = require('knex')({
     client: 'pg',
     version: '16.2',
     connection: {
-      host : '127.0.0.1',
+      host : 'postgres://nutri:G0p7ppvvZbULBgTvM6CrsKNvpbeorbOb@dpg-cnbnm3ect0pc73ff2hk0-a/nutridb_rfk3',
       port : 5432,
       user : 'nutri',
-      password : 'dwryhs478',
+      password : 'G0p7ppvvZbULBgTvM6CrsKNvpbeorbOb',
       database : 'nutridb'
     }
   });
