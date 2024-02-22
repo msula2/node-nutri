@@ -21,19 +21,37 @@ const db = require('knex')({
   });
   
 
-app.post("/register", (req, res) => {
-   const {username, password} = req.body;
-   db('users')
-    .returning('*')
-    .insert({
-        username: username,
-        password: password
-    })
-    .then(response => {
-        res.json(response);
-    })
-    .catch(err => res.status(400).json(err));  
+
+  app.post("/register", (req, res) => {
+    const { username, password } = req.body;
+    db('users')
+        .where('username', username)
+        .first()
+        .then(existingUser => {
+            if (existingUser) {
+                throw new Error('Username already exists');
+            } else {
+                return db('users')
+                    .returning('*')
+                    .insert({
+                        username: username,
+                        password: password
+                    });
+            }
+        })
+        .then(response => {
+            res.json({
+                result: "success",
+                message: "Registration successful"
+            });
+        })
+        .catch(err => {
+            console.error("Error occurred during registration:", err);
+            res.status(400).json({ error: err.message });
+        });  
 });
+ 
+ 
 
 app.post("/login", (req, res) => {
   const {username, password} = req.body;
