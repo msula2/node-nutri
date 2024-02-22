@@ -13,7 +13,7 @@ const db = require('knex')({
     client: 'pg',
     version: '16.2',
     connection: {
-      host : 'postgres://nutri:G0p7ppvvZbULBgTvM6CrsKNvpbeorbOb@dpg-cnbnm3ect0pc73ff2hk0-a.oregon-postgres.render.com/nutridb_rfk3',
+      host : 'dpg-cnbnm3ect0pc73ff2hk0-a.oregon-postgres.render.com',
       port : 5432,
       user : 'nutri',
       password : 'G0p7ppvvZbULBgTvM6CrsKNvpbeorbOb',
