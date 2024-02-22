@@ -17,7 +17,7 @@ const db = require('knex')({
       port : 5432,
       user : 'nutri',
       password : 'G0p7ppvvZbULBgTvM6CrsKNvpbeorbOb',
-      database : 'nutridb'
+      database : 'nutridb_rfk3'
     }
   });
   
