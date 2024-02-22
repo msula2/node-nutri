@@ -9,26 +9,14 @@ app.use(bodyParser.json());
 
 app.use(cors());
 
-// const db = require('knex')({
-//     client: 'pg',
-//     version: '16.2',
-//     connection: {
-//       host : '127.0.0.1',
-//       port : 5432,
-//       user : 'nutri',
-//       password : 'dwryhs478',
-//       database : 'nutridb'
-//     }
-//   });
-
 const db = require('knex')({
   client: 'pg',
   connection: {
-    connectionString: "postgres://nutri:G0p7ppvvZbULBgTvM6CrsKNvpbeorbOb@dpg-cnbnm3ect0pc73ff2hk0-a/nutridb_rfk3",
-    port: 5432,
-    user: "nutri",
-    database: "nutridb_rfk3",
-    password: "G0p7ppvvZbULBgTvM6CrsKNvpbeorbOb",
+    connectionString: process.env.DB_HOST,
+    port: process.env.DB_PORT,
+    user: process.env.USER,
+    database: process.env.DB_NAME,
+    password: process.env.DB_PASSWORD,
     ssl: {rejectUnauthorized: false }
   }
 });
