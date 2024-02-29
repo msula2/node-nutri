@@ -84,6 +84,70 @@ app.post("/register", (req, res) => {
     });  
 });
 
+app.post("/recipe", (req, res) => {
+  const { title, description = "", ingredients, instructions } = req.body;
+  db('recipes')
+    .where('title', title)
+    .first()
+    .then(existingUser => {
+      if (existingUser) {
+        throw new Error('Recipe already exists with this title');
+      } else {
+        return db('recipes')
+          .returning('*')
+          .insert({
+            title: title,
+            description: description,
+            ingredients: ingredients,
+            instructions: instructions
+          });
+      }
+    })
+    .then(response => {
+      res.json({
+        result: "success",
+        message: "Recipe added successfully"
+      });
+    })
+    .catch(err => {
+      console.error("Error occurred while adding recipe:", err);
+      res.status(400).json({ error: err.message });
+    });  
+});
+
+app.get("/recipe", (req, res) => {
+  const { title = ""} = req.body;
+  if(title != ""){
+    db('recipes')
+    .where({
+      title: title
+    }).select('title', 'description', 'ingredients', 'instructions')
+    .then(response => {
+      if (response.length == 0){
+        res.status(404).json({
+          result: "failed",
+          error: "Recipe not found"
+        })
+      }
+      else{
+        res.json({
+          result: "success", 
+          data: response[0]
+        });
+      }
+    })
+    .catch(err => {
+      console.log(err);
+      res.status(400).json({
+        result: "failed",
+        error: "Error establishing a database connection"
+      })
+    });  
+  } else{
+    //TODO: return all recipes (Or at least a list of some of them)
+  }
+});
+
 app.get("/user", (req, res) => {
   console.log("getting user session")
   if(!req.session.userID){
