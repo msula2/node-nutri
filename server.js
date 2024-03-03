@@ -10,7 +10,14 @@ const app = express();
 
 app.use(bodyParser.json());
 app.use(cookieParser());
-app.use(cors());
+
+app.use(
+  cors({
+    credentials: true,
+    origin: "http://localhost:3000"
+  })
+);
+
 
 let db;
 if(process.env.TEST == false){
@@ -41,19 +48,26 @@ if(process.env.TEST == false){
 
 app.use(session({
   secret: 'keyboard cat',
-  resave: true,
-  saveUninitialized: true
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 600000
+  }
 }));
 
-// function checkSignIn(req, res){
-//   if(req.session.userID){
-//      next();     //If session exists, proceed to page
-//   } else {
-//      var err = new Error("Not logged in!");
-//      console.log(req.session.user);
-//      next(err);  //Error, trying to access unauthorized page!
-//   }
-// }
+const checkSignIn = (req, res, next) => {
+  console.log(req.session);
+  if(req.session.user){
+    console.log("User is on the session");
+    next();    
+  } else {
+    console.log("User is not on the session");
+    return res.status(401).json({
+      result: "failed",
+      error: "Unauthorized"
+    })
+  }
+}
 
 app.post("/register", (req, res) => {
   const { username, password } = req.body;
@@ -84,9 +98,8 @@ app.post("/register", (req, res) => {
     });  
 });
 
-app.get("/user", (req, res) => {
-  console.log("getting user session")
-  if(!req.session.userID){
+app.get("/user", checkSignIn, (req, res) => {
+  if(!req.session.user){
     console.log("logged out")
     res.json({
       result: "logged out"
@@ -95,34 +108,8 @@ app.get("/user", (req, res) => {
     console.log("logged in")
     res.json({
       result: "logged in",
-      data: req.session.userID
+      data: req.session.user
     })
-    // db('users')
-    //   .where({
-    //     id: req.session.userID,
-    //   }).select('id', 'username')
-    //   .then(response => {
-    //     if (response.length == 0){
-    //       res.json({
-    //         result: "failed",
-    //         error: "Couldn't find user"
-    //       })
-    //     }
-    //     else{
-    //       res.json({
-    //         result: "success", 
-    //         data: response
-    //       });
-    //     }
-        
-    // })
-    // .catch(err => {
-    //   console.log(err);
-    //   res.status(400).json({
-    //     result: "failed",
-    //     error: "Error establishing a database connection"
-    //   })
-    // });  
   }
 });
 
@@ -142,7 +129,8 @@ app.post("/login", (req, res) => {
         })
       }
       else{
-        req.session.userID = response[0];
+        req.session.user = response[0];
+        console.log(req.session);
         res.json({
           result: "success", 
           data: response[0]
