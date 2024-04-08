@@ -98,6 +98,64 @@ app.post("/register", (req, res) => {
     });  
 });
 
+app.delete("/recipe", (req, res) => {
+  const { title } = req.body;
+  db('recipes')
+    .where('title', title)
+    .first()
+    .then(existingUser => {
+      if (existingUser) {
+        return db('recipes')
+          .returning('*')
+          .where('title', title)
+          .delete();
+      } else {
+        throw new Error('No Recipe exists with this title');
+      }
+    })
+    .then(response => {
+      res.json({
+        result: "success",
+        message: "Recipe deleted successfully"
+      });
+    })
+    .catch(err => {
+      console.error("Error occurred while deleting recipe:", err);
+      res.status(400).json({ error: err.message });
+    });  
+});
+
+app.put("/recipe", (req, res) => {
+  const { title, description = "", ingredients, instructions } = req.body;
+  db('recipes')
+    .where('title', title)
+    .first()
+    .then(existingUser => {
+      if (existingUser) {
+        return db('recipes')
+          .returning('*')
+          .where('title', title)
+          .update({
+            description: description,
+            ingredients: ingredients,
+            instructions: instructions
+          });
+      } else {
+        throw new Error('No Recipe exists with this title');
+      }
+    })
+    .then(response => {
+      res.json({
+        result: "success",
+        message: "Recipe updated successfully"
+      });
+    })
+    .catch(err => {
+      console.error("Error occurred while updating recipe:", err);
+      res.status(400).json({ error: err.message });
+    });  
+});
+
 app.post("/recipe", (req, res) => {
   const { title, description = "", ingredients, instructions } = req.body;
   db('recipes')
@@ -130,7 +188,8 @@ app.post("/recipe", (req, res) => {
 });
 
 app.get("/recipe", (req, res) => {
-  const { title = ""} = req.body;
+  const { title = ""} = req.query;
+  console.log("getting recipe for " + title);
   if(title != ""){
     db('recipes')
     .where({
@@ -158,6 +217,7 @@ app.get("/recipe", (req, res) => {
       })
     });  
   } else{
+    res.send('TODO: return all recipes (Or at least a list of some of them)')
     //TODO: return all recipes (Or at least a list of some of them)
   }
 });
