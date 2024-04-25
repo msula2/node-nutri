@@ -147,6 +147,484 @@ app.post("/login", (req, res) => {
   });  
 });
 
+app.get("/calories/groups/:group/categories/get", (req, res) => {
+  db("food_categories")
+    .where({
+      foodgroup: req.params.group
+    })
+    .select('label', 'value')
+    .then(response => {
+      if (response.length != 0){
+        res.json({
+          result: "success",
+          categories: response
+        })
+      }
+      else{
+        res.json({
+          result: "success",
+          categories: []
+        })
+
+      }
+    })
+    .catch(err => {
+      console.log(err);
+      res.status(400).json({
+        result: "failed",
+        error: "Error establishing a database connection"
+      })
+    });
+});
+
+
+app.get("/calories/categories/:category/items/get", (req, res) => {
+  db("food_items")
+    .where({
+      foodcategory: req.params.category
+    })
+    .select('label', 'value')
+    .then(response => {
+      if (response.length != 0){
+        res.json({
+          result: "success",
+          items: response
+        })
+      }
+      else{
+        res.json({
+          result: "success",
+          items: []
+        })
+
+      }
+    })
+    .catch(err => {
+      console.log(err);
+      res.status(400).json({
+        result: "failed",
+        error: "Error establishing a database connection"
+      })
+    });
+});
+
+app.get("/calories/items/:item/get", (req, res) => {
+  db('food_items')
+  .select(
+    'food_items.serving_size',
+    'food_items.serving_unit',
+    'food_groups.calories',
+    'food_groups.carbohydrate',
+    'food_groups.protien',
+    'food_groups.fat'
+  )
+  .join('food_groups', 'food_items.foodgroup', 'food_groups.value')
+  .where('food_items.value', req.params.item)
+  .then((response) => {
+    if (response.length != 0){
+      let serving_size = parseFloat(response[0].serving_size);
+
+      serving_size = 1 / serving_size;
+      let calories_per_serving = serving_size * response[0].calories;
+      let carbs_per_serving = serving_size * response[0].carbohydrate;
+      let prots_per_serving = serving_size * response[0].protien;
+      let fats_per_serving = serving_size * response[0].fat;
+
+      let ret = {
+        Calories: calories_per_serving,
+        breakdown:{
+          grams: [
+            {name: 'Proteins', value: prots_per_serving},
+            {name: 'Carbohydrates', value: carbs_per_serving},
+            {name: 'Fats', value: fats_per_serving }
+          ],
+          calories: {
+            carbohydrates: carbs_per_serving * 4,
+            proteins: prots_per_serving * 4,
+            fats: fats_per_serving * 9,
+            total: (carbs_per_serving * 4) + (prots_per_serving * 4) + (fats_per_serving * 9)
+
+          }
+        }, 
+        serving_unit: response[0].serving_unit
+      }
+
+      res.json({
+        result: "success",
+        item: ret
+      })
+    }
+    else{
+      res.json({
+        result: "success",
+        item: {}
+      })
+
+    }
+  })
+  .catch(err => {
+    console.log(err);
+    res.status(400).json({
+      result: "failed",
+      error: "Error establishing a database connection"
+    })
+  });
+  
+
+});
+
+
+app.post("/calories/user/:user/meal/add", (req, res) => {
+  const {name, datetime, meal_ingredients} = req.body;
+  const user = req.params.user; 
+
+  const mealData = {
+    name: name,
+    datetime: datetime,
+    userid: user
+  }
+
+  let mealIngredientsData = meal_ingredients;
+
+  db.transaction(async (trx) => {
+    try {
+
+      const [mealId] = await trx('meals').insert(mealData).returning('id');
+  
+
+      const mealIngredients= mealIngredientsData.map((ingredient) => ({
+        meal_id: mealId.id,
+        meal_name: mealData.name, 
+        food_item_value: ingredient.value,
+        food_item_label: ingredient.label,
+        quantity: ingredient.serving_size
+      }));
+  
+
+      await trx('meal_ingredients').insert(mealIngredients);
+  
+
+      await trx.commit();
+
+      res.status(200).json({
+        result: "success",
+        message: "Successfully added to table"
+      })
+
+    } catch (error) {
+
+      await trx.rollback(error);
+      console.error('Error inserting data:', error);
+      res.status(400).json({
+        result: "failed",
+        message: "Error establishing a database connection"
+      })
+    } finally {
+
+      db.destroy();
+    }
+  });
+  
+});
+
+
+app.get("/calories/meals/:mealId/breakdown", (req, res) => {
+  const mealId = req.params.mealId;
+
+  db('meals')
+    .select('id', 'name', 'datetime')
+    .where('id', mealId)
+    .then((mealInfo) => {
+      if (mealInfo.length === 0) {
+        return res.json({
+          result: "failed",
+          error: "Meal not found"
+        });
+      }
+
+      const mealId = mealInfo[0].id;
+      const mealName = mealInfo[0].name;
+      const mealDatetime = mealInfo[0].datetime;
+
+      db('meal_ingredients')
+        .select(
+          'food_items.label',
+          'food_items.serving_size',
+          'food_items.serving_unit',
+          'food_groups.calories',
+          'food_groups.carbohydrate',
+          'food_groups.protien',
+          'food_groups.fat'
+        )
+        .join('food_items', 'meal_ingredients.food_item_value', 'food_items.value')
+        .join('food_groups', 'food_items.foodgroup', 'food_groups.value')
+        .where('meal_ingredients.meal_id', mealId)
+        .then((ingredients) => {
+          if (ingredients.length !== 0) {
+            const breakdown = ingredients.map((ingredient) => {
+              let serving_size = parseFloat(ingredient.serving_size);
+              serving_size = 1 / serving_size;
+
+              const calories_per_serving = serving_size * ingredient.calories;
+              const carbs_per_serving = serving_size * ingredient.carbohydrate;
+              const prots_per_serving = serving_size * ingredient.protien;
+              const fats_per_serving = serving_size * ingredient.fat;
+
+              return {
+                name: ingredient.label,
+                breakdown: {
+                  grams: [
+                    { name: 'Proteins', value: prots_per_serving },
+                    { name: 'Carbohydrates', value: carbs_per_serving },
+                    { name: 'Fats', value: fats_per_serving }
+                  ],
+                  calories: {
+                    carbohydrates: carbs_per_serving * 4,
+                    proteins: prots_per_serving * 4,
+                    fats: fats_per_serving * 9,
+                    total: (carbs_per_serving * 4) + (prots_per_serving * 4) + (fats_per_serving * 9)
+                  }
+                },
+                serving_unit: ingredient.serving_unit
+              };
+            });
+
+            res.json({
+              result: "success",
+              meal_id: mealId,
+              meal_name: mealName,
+              datetime: mealDatetime,
+              breakdown: breakdown
+            });
+          } else {
+            res.json({
+              result: "success",
+              meal_id: mealId,
+              meal_name: mealName,
+              datetime: mealDatetime,
+              breakdown: []
+            });
+          }
+        })
+        .catch((err) => {
+          console.error(err);
+          res.status(400).json({
+            result: "failed",
+            error: "Error retrieving breakdown"
+          });
+        });
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(400).json({
+        result: "failed",
+        error: "Error retrieving meal information"
+      });
+    });
+});
+
+
+app.get("/calories/user/:userId/meals/summary", (req, res) => {
+  const userId = req.params.userId;
+
+  db('meals')
+    .select('id', 'name', 'datetime')
+    .where('userid', userId)
+    .then(async (meals) => {
+      const mealBreakdowns = [];
+      for (const meal of meals) {
+        const mealId = meal.id;
+        const mealName = meal.name;
+        const mealDatetime = meal.datetime;
+
+        const ingredients = await db('meal_ingredients')
+          .select(
+            'food_items.label',
+            'food_items.serving_size',
+            'food_items.serving_unit',
+            'food_groups.calories',
+            'food_groups.carbohydrate',
+            'food_groups.protien',
+            'food_groups.fat'
+          )
+          .join('food_items', 'meal_ingredients.food_item_value', 'food_items.value')
+          .join('food_groups', 'food_items.foodgroup', 'food_groups.value')
+          .where('meal_ingredients.meal_id', mealId);
+
+        let totalCalories = 0;
+        let totalNutrients = {
+          Proteins: 0,
+          Carbohydrates: 0,
+          Fats: 0
+        };
+
+        ingredients.forEach((ingredient) => {
+          let serving_size = parseFloat(ingredient.serving_size);
+          serving_size = 1 / serving_size;
+
+          const calories_per_serving = serving_size * ingredient.calories;
+          const carbs_per_serving = serving_size * ingredient.carbohydrate;
+          const prots_per_serving = serving_size * ingredient.protien;
+          const fats_per_serving = serving_size * ingredient.fat;
+
+          totalCalories += calories_per_serving;
+          totalNutrients.Proteins += prots_per_serving;
+          totalNutrients.Carbohydrates += carbs_per_serving;
+          totalNutrients.Fats += fats_per_serving;
+        });
+
+        const mealBreakdown = {
+          meal_id: mealId,
+          meal_name: mealName,
+          datetime: mealDatetime,
+          breakdown: {
+            grams: [
+              { name: 'Proteins', value: totalNutrients.Proteins },
+              { name: 'Carbohydrates', value: totalNutrients.Carbohydrates },
+              { name: 'Fats', value: totalNutrients.Fats }
+            ],
+            calories: {
+              carbohydrates: totalNutrients.Carbohydrates * 4,
+              proteins: totalNutrients.Proteins * 4,
+              fats: totalNutrients.Fats * 9,
+              total: totalCalories
+            }
+          }
+        };
+
+        mealBreakdowns.push(mealBreakdown);
+      }
+
+      res.json({
+        result: "success",
+        meals: mealBreakdowns
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(400).json({
+        result: "failed",
+        error: "Error retrieving meal information"
+      });
+    });
+});
+
+
+
+app.get("/calories/user/:userId/meals/breakdown", (req, res) => {
+  const userId = req.params.userId;
+
+  db('meals')
+    .select('id', 'name', 'datetime')
+    .where('userid', userId)
+    .then(async (meals) => {
+      const mealBreakdowns = [];
+      for (const meal of meals) {
+        const mealId = meal.id;
+        const mealName = meal.name;
+        const mealDatetime = meal.datetime;
+
+        const ingredients = await db('meal_ingredients')
+          .select(
+            'food_items.label',
+            'food_items.serving_size',
+            'food_items.serving_unit',
+            'food_groups.calories',
+            'food_groups.carbohydrate',
+            'food_groups.protien',
+            'food_groups.fat'
+          )
+          .join('food_items', 'meal_ingredients.food_item_value', 'food_items.value')
+          .join('food_groups', 'food_items.foodgroup', 'food_groups.value')
+          .where('meal_ingredients.meal_id', mealId);
+
+        let totalCalories = 0;
+        let totalNutrients = {
+          Proteins: 0,
+          Carbohydrates: 0,
+          Fats: 0
+        };
+
+        const foodItems = ingredients.map((ingredient) => {
+          let serving_size = parseFloat(ingredient.serving_size);
+          serving_size = 1 / serving_size;
+
+          const calories_per_serving = serving_size * ingredient.calories;
+          const carbs_per_serving = serving_size * ingredient.carbohydrate;
+          const prots_per_serving = serving_size * ingredient.protien;
+          const fats_per_serving = serving_size * ingredient.fat;
+
+          totalCalories += calories_per_serving;
+          totalNutrients.Proteins += prots_per_serving;
+          totalNutrients.Carbohydrates += carbs_per_serving;
+          totalNutrients.Fats += fats_per_serving;
+
+          return {
+            name: ingredient.label,
+            breakdown: {
+              grams: [
+                { name: 'Proteins', value: prots_per_serving },
+                { name: 'Carbohydrates', value: carbs_per_serving },
+                { name: 'Fats', value: fats_per_serving }
+              ],
+              calories: {
+                carbohydrates: carbs_per_serving * 4,
+                proteins: prots_per_serving * 4,
+                fats: fats_per_serving * 9,
+                total: calories_per_serving
+              }
+            },
+            serving_unit: ingredient.serving_unit
+          };
+        });
+
+        const gramsBreakdown = [
+          { name: 'Proteins', value: totalNutrients.Proteins },
+          { name: 'Carbohydrates', value: totalNutrients.Carbohydrates },
+          { name: 'Fats', value: totalNutrients.Fats }
+        ];
+
+        const caloriesBreakdown = {
+          carbohydrates: totalNutrients.Carbohydrates * 4,
+          proteins: totalNutrients.Proteins * 4,
+          fats: totalNutrients.Fats * 9,
+          total: totalCalories
+        };
+
+        const mealBreakdown = {
+          meal_id: mealId,
+          meal_name: mealName,
+          datetime: mealDatetime,
+          food_items: foodItems,
+          breakdown: {
+            grams: gramsBreakdown,
+            calories: caloriesBreakdown
+          }
+        };
+
+        mealBreakdowns.push(mealBreakdown);
+      }
+
+      res.json({
+        result: "success",
+        meals: mealBreakdowns
+      });
+    })
+    .catch((err) => {
+      console.error(err);
+      res.status(400).json({
+        result: "failed",
+        error: "Error retrieving meal information"
+      });
+    });
+});
+
+
+
+
+
+
+
 app.listen(PORT, () => {
     console.log("App is running on port ", PORT);
 })
