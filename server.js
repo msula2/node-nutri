@@ -15,12 +15,9 @@ app.use(cookieParser());
 app.use(
   cors({
     credentials: true,
-    origin: "https://react-nutri.onrender.com"
+    origin: process.env.TEST == false ? "https://react-nutri.onrender.com" : "http://localhost:3000"
   })
 );
-
-app.use(express.static(path.join(__dirname, 'build')));
-
 
 
 let db;
@@ -875,10 +872,6 @@ app.get("/calories/user/:userId/meals/breakdown", (req, res) => {
     });
 });
 
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
 
 app.listen(PORT, () => {
     console.log("App is running on port ", PORT);
