@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 var session = require('express-session');
 var cookieParser = require('cookie-parser');
 const cors = require('cors');
+const path = require('path');
 require('dotenv').config();
 const PORT = process.env.PORT || 3001 ;
 
@@ -17,6 +18,9 @@ app.use(
     origin: "https://react-nutri.onrender.com"
   })
 );
+
+app.use(express.static(path.join(__dirname, 'build')));
+
 
 
 let db;
@@ -69,6 +73,9 @@ const checkSignIn = (req, res, next) => {
     })
   }
 }
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
 
 app.post("/login", (req, res) => {
   const {username, password} = req.body;
