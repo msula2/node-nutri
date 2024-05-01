@@ -20,12 +20,6 @@ app.use(
     origin: "https://react-nutri.onrender.com"
   })
 );
-
-console.log(["TEST: ", process.env.TEST])
-console.log(["DB_HOST: ", process.env.DB_HOST])
-console.log(["USER: ", process.env.USER])
-console.log(["DB_NAME: ", process.env.DB_NAME])
-console.log(["DB_PASSWORD: ", process.env.DB_PASSWORD])
 let db;
 
 db = require('knex')({
@@ -33,7 +27,7 @@ db = require('knex')({
   connection: {
     connectionString: process.env.DB_HOST,
     port: process.env.DB_PORT,
-    user: process.env.USER,
+    user: process.env.DB_USER,
     database: process.env.DB_NAME,
     password: process.env.DB_PASSWORD,
     ssl: {rejectUnauthorized: false }
