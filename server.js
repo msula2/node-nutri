@@ -12,6 +12,8 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cookieParser());
 
+console.log("process.env.TEST: ",process.env.TEST)
+
 app.use(
   cors({
     credentials: true,
