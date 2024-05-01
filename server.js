@@ -15,7 +15,7 @@ app.use(cookieParser());
 app.use(
   cors({
     credentials: true,
-    origin: "http://localhost:3000"
+    origin: "https://node-nutri.onrender.com"
   })
 );
 
@@ -73,6 +73,10 @@ const checkSignIn = (req, res, next) => {
     })
   }
 }
+
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
 
 
 app.post("/login", (req, res) => {
@@ -876,10 +880,6 @@ app.get("/calories/user/:userId/meals/breakdown", (req, res) => {
     });
 });
 
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
 
 app.listen(PORT, () => {
     console.log("App is running on port ", PORT);
