@@ -51,23 +51,58 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    maxAge: 600000
-  }
+    maxAge: 6000000 
+  },
+  store: new session.MemoryStore()
 }));
 
+
 const checkSignIn = (req, res, next) => {
-  console.log(req.session);
   if(req.session.user){
     console.log("User is on the session");
     next();    
   } else {
     console.log("User is not on the session");
-    return res.status(401).json({
+    return res.json({
       result: "failed",
-      error: "Unauthorized"
+      loggedIn: false
     })
   }
 }
+
+app.post("/login", (req, res) => {
+  const {username, password} = req.body;
+  console.log("Username:", username, "Password: ", password);
+  db('users')
+    .where({
+      username: username,
+      password:  password
+    }).select('id', 'username')
+    .then(response => {
+      if (response.length == 0){
+        res.json({
+          result: "failed",
+          error: "Incorrect username/password entered"
+        })
+      }
+      else{
+        req.session.user = response[0];
+        console.log(req.session);
+        res.json({
+          result: "success", 
+          user: response[0]
+        });
+      }
+      
+  })
+  .catch(err => {
+    console.log(err);
+    res.status(400).json({
+      result: "failed",
+      error: "Error establishing a database connection"
+    })
+  });  
+});
 
 app.post("/register", (req, res) => {
   const { username, password } = req.body;
@@ -99,53 +134,232 @@ app.post("/register", (req, res) => {
 });
 
 app.get("/user", checkSignIn, (req, res) => {
-  if(!req.session.user){
-    console.log("logged out")
+  if(req.session.user){
+    console.log("logged-in")
     res.json({
-      result: "logged out"
+      loggedIn: true,
+      user: req.session.user
     })
+    
   } else{
-    console.log("logged in")
-    res.json({
-      result: "logged in",
-      data: req.session.user
-    })
+    console.log("timed-out")
   }
 });
 
-app.post("/login", (req, res) => {
-  const {username, password} = req.body;
-  console.log("Username:", username, "Password: ", password);
-  db('users')
-    .where({
-      username: username,
-      password:  password
-    }).select('id', 'username')
+app.delete("/recipe/delete", (req, res) => {
+  const { title } = req.body;
+  db('recipes')
+    .where('title', title)
+    .first()
+    .then(existingUser => {
+      if (existingUser) {
+        return db('recipes')
+          .returning('*')
+          .where('title', title)
+          .delete();
+      } else {
+        throw new Error('No Recipe exists with this title');
+      }
+    })
     .then(response => {
-      if (response.length == 0){
+      res.json({
+        result: "success",
+        message: "Recipe deleted successfully"
+      });
+    })
+    .catch(err => {
+      console.error("Error occurred while deleting recipe:", err);
+      res.status(400).json({ error: err.message });
+    });  
+});
+
+app.put("/recipe", (req, res) => {
+  const { title, description = "", ingredients, instructions } = req.body;
+  db('recipes')
+    .where('title', title)
+    .first()
+    .then(existingUser => {
+      if (existingUser) {
+        return db('recipes')
+          .returning('*')
+          .where('title', title)
+          .update({
+            description: description,
+            ingredients: ingredients,
+            instructions: instructions
+          });
+      } else {
+        throw new Error('No Recipe exists with this title');
+      }
+    })
+    .then(response => {
+      res.json({
+        result: "success",
+        message: "Recipe updated successfully"
+      });
+    })
+    .catch(err => {
+      console.error("Error occurred while updating recipe:", err);
+      res.status(400).json({ error: err.message });
+    });  
+});
+
+
+app.post("/recipe/add", (req, res) => {
+  const { title, description, ingredients, instructions } = req.body;
+
+  db.transaction(trx => {
+    trx('recipes')
+      .insert({
+        title: title,
+        description: description,
+        ingredients: ingredients.map(ingredient => `(${ingredient.label})`).join(', '),
+        instructions: instructions.map(instruction => instruction.value).join(', ')
+      })
+      .returning('id')
+      .then(([recipeId]) => {
+        const ingredientPromises = ingredients.map(ingredient => {
+          return trx('items_recipes')
+            .insert({
+              food_item: ingredient.value,
+              recipe: title,
+              recipe_id: recipeId.id,
+              amount: ingredient.serving_size
+            });
+        });
+
+        return Promise.all(ingredientPromises)
+          .then(() => trx.commit())
+          .then(() => {
+            res.json({
+              result: "success",
+              message: "Recipe added successfully"
+            });
+          });
+      })
+      .catch(err => {
+        console.error("Error occurred while adding recipe:", err);
+        trx.rollback();
+        res.status(400).json({
+          result: "failed",
+          message: "Error establishing a database connection"
+        });
+      });
+  });
+});
+
+
+
+app.get("/recipes/:title/get", (req, res) => {
+  let title = req.params.title;
+  db('recipes')
+    .where('title', 'like', title[0] + '%')
+    .select('title', 'description', 'ingredients', 'instructions', 'id')
+    .then(response => {
+      if (response.length == 0) {
         res.json({
           result: "failed",
-          error: "Incorrect username/password entered"
-        })
-      }
-      else{
-        req.session.user = response[0];
-        console.log(req.session);
+          error: "Recipe not found"
+        });
+      } else {
         res.json({
-          result: "success", 
-          data: response[0]
+          result: "success",
+          data: response
         });
       }
-      
-  })
-  .catch(err => {
-    console.log(err);
-    res.status(400).json({
-      result: "failed",
-      error: "Error establishing a database connection"
     })
-  });  
+    .catch(err => {
+      console.log(err);
+      res.status(400).json({
+        result: "failed",
+        error: "Error establishing a database connection"
+      });
+    });
 });
+
+app.get("/recipes/:recipeId/calories/get", (req, res) => {
+  const recipeId = req.params.recipeId;
+
+  db.select(
+      'food_items.serving_size',
+      'food_items.serving_unit',
+      'food_items.label',
+      'food_groups.calories',
+      'food_groups.carbohydrate',
+      'food_groups.protien',
+      'food_groups.fat',
+      'items_recipes.amount'
+  )
+  .from('items_recipes')
+  .join('food_items', 'items_recipes.food_item', 'food_items.value')
+  .join('food_groups', 'food_items.foodgroup', 'food_groups.value')
+  .where('items_recipes.recipe_id', recipeId)
+  .then((response) => {
+    console.log(response);
+    if (response.length !== 0) {
+      // Define an array to store the breakdown for each item
+      const breakdowns = [];
+  
+      // Iterate over each item in the response
+      response.forEach(item => {
+          let serving_size = parseFloat(item.serving_size);
+          serving_size = 1 / serving_size;
+          let amount = item.amount != undefined && item.amount != null ? parseFloat(item.amount) : 1;
+          let calories_per_serving = (serving_size * item.calories) * amount;
+          let carbs_per_serving = (serving_size * item.carbohydrate) * amount;
+          let prots_per_serving = (serving_size * item.protien) * amount;
+          let fats_per_serving = (serving_size * item.fat) * amount;
+  
+          // Calculate total calories for each nutrient
+          const total_calories = (carbs_per_serving * 4) + (prots_per_serving * 4) + (fats_per_serving * 9);
+  
+          // Push the breakdown for the current item to the breakdowns array
+          breakdowns.push({
+              name: item.food_item,
+              calories: calories_per_serving.toFixed(1),
+              breakdown: {
+                  grams: [
+                      { name: 'Proteins', value: parseFloat(prots_per_serving.toFixed(1)) },
+                      { name: 'Carbohydrates', value: parseFloat(carbs_per_serving.toFixed(1)) },
+                      { name: 'Fats', value: parseFloat(fats_per_serving.toFixed(1))}
+                  ],
+                  calories: {
+                      carbohydrates: (carbs_per_serving * 4).toFixed(1),
+                      proteins: (prots_per_serving * 4).toFixed(1),
+                      fats: (fats_per_serving * 9).toFixed(1),
+                      total: total_calories.toFixed(1)
+                  }
+              },
+              serving_unit: item.serving_unit,
+              label: item.label ,
+              amount: amount.toString()
+          });
+      });
+  
+      // Send the breakdowns array as the response
+      res.json({
+          result: "success",
+          items: breakdowns
+      });
+  } else {
+      // Handle case where no items are found
+      res.json({
+          result: "success",
+          items: []
+      });
+  }
+  })
+  .catch((error) => {
+      // Handle database error
+      console.error(error);
+      res.status(500).json({
+          result: "error",
+          message: "Error retrieving recipe information"
+      });
+  });
+});
+
+
 
 app.get("/calories/groups/:group/categories/get", (req, res) => {
   db("food_categories")
@@ -274,9 +488,9 @@ app.get("/calories/items/:item/get", (req, res) => {
 });
 
 
-app.post("/calories/user/:user/meal/add", (req, res) => {
-  const {name, datetime, meal_ingredients} = req.body;
-  const user = req.params.user; 
+app.post("/calories/user/:user/meal/add", checkSignIn, async (req, res) => {
+  const { name, datetime, meal_ingredients } = req.body;
+  const user = req.params.user;
 
   const mealData = {
     name: name,
@@ -286,46 +500,81 @@ app.post("/calories/user/:user/meal/add", (req, res) => {
 
   let mealIngredientsData = meal_ingredients;
 
-  db.transaction(async (trx) => {
-    try {
-
+  try {
+    await db.transaction(async (trx) => {
       const [mealId] = await trx('meals').insert(mealData).returning('id');
-  
 
-      const mealIngredients= mealIngredientsData.map((ingredient) => ({
+      const mealIngredients = mealIngredientsData.map((ingredient) => ({
         meal_id: mealId.id,
-        meal_name: mealData.name, 
+        meal_name: mealData.name,
         food_item_value: ingredient.value,
         food_item_label: ingredient.label,
         quantity: ingredient.serving_size
       }));
-  
 
       await trx('meal_ingredients').insert(mealIngredients);
-  
 
       await trx.commit();
 
       res.status(200).json({
         result: "success",
         message: "Successfully added to table"
-      })
-
-    } catch (error) {
-
-      await trx.rollback(error);
-      console.error('Error inserting data:', error);
-      res.status(400).json({
-        result: "failed",
-        message: "Error establishing a database connection"
-      })
-    } finally {
-
-      db.destroy();
-    }
-  });
-  
+      });
+    });
+  } catch (error) {
+    console.error('Error inserting data:', error);
+    res.status(400).json({
+      result: "failed",
+      message: "Error establishing a database connection"
+    });
+  }
 });
+
+app.delete("/calories/user/:user/meal/:mealId/delete", checkSignIn, async (req, res) => {
+  const mealId = req.params.mealId; 
+  const user = req.params.user;
+
+  try {
+    const existingMeal = await db('meals')
+      .where({
+        id: mealId,
+        userid: user
+      })
+      .first();
+
+    if (!existingMeal) {
+      throw new Error('No meal exists with this ID for the current user');
+    }
+
+    await db.transaction(async (trx) => {
+      await trx('meals')
+        .where({
+          id: mealId,
+          userid: user
+        })
+        .del();
+
+      await trx('meal_ingredients')
+        .where('meal_id', mealId)
+        .del();
+
+      await trx.commit();
+
+      res.status(200).json({
+        result: "success",
+        message: "Meal deleted successfully"
+      });
+    });
+  } catch (error) {
+    console.error('Error deleting meal:', error);
+    res.status(400).json({
+      result: "failed",
+      message: error.message
+    });
+  }
+});
+
+
 
 
 app.get("/calories/meals/:mealId/breakdown", (req, res) => {
@@ -532,7 +781,8 @@ app.get("/calories/user/:userId/meals/breakdown", (req, res) => {
             'food_groups.calories',
             'food_groups.carbohydrate',
             'food_groups.protien',
-            'food_groups.fat'
+            'food_groups.fat',
+            'meal_ingredients.quantity'
           )
           .join('food_items', 'meal_ingredients.food_item_value', 'food_items.value')
           .join('food_groups', 'food_items.foodgroup', 'food_groups.value')
@@ -549,10 +799,11 @@ app.get("/calories/user/:userId/meals/breakdown", (req, res) => {
           let serving_size = parseFloat(ingredient.serving_size);
           serving_size = 1 / serving_size;
 
-          const calories_per_serving = serving_size * ingredient.calories;
-          const carbs_per_serving = serving_size * ingredient.carbohydrate;
-          const prots_per_serving = serving_size * ingredient.protien;
-          const fats_per_serving = serving_size * ingredient.fat;
+          let quantity = ingredient.quantity != undefined && ingredient.quantity != null ? parseFloat(ingredient.quantity) : 1;
+          const calories_per_serving = (serving_size * ingredient.calories) * quantity;
+          const carbs_per_serving = (serving_size * ingredient.carbohydrate) * quantity;
+          const prots_per_serving = (serving_size * ingredient.protien) * quantity;
+          const fats_per_serving = (serving_size * ingredient.fat) * quantity;
 
           totalCalories += calories_per_serving;
           totalNutrients.Proteins += prots_per_serving;
@@ -574,7 +825,8 @@ app.get("/calories/user/:userId/meals/breakdown", (req, res) => {
                 total: calories_per_serving
               }
             },
-            serving_unit: ingredient.serving_unit
+            serving_unit: ingredient.serving_unit,
+            quantity: quantity.toString()
           };
         });
 
