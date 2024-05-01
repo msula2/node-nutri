@@ -12,27 +12,41 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-console.log("process.env.TEST: ",process.env.TEST)
 
 app.use(
   cors({
     credentials: true,
-    origin: "https://react-nutri.onrender.com"
+    origin: process.env.NODE_ENV === 'development' ? "http://localhost:3000" : "https://react-nutri.onrender.com"
   })
 );
 let db;
+if (process.env.NODE_ENV === 'development'){
+  db = require('knex')({
+    client: 'pg',
+    version: '16.2',
+    connection: {
+      host : process.env.DB_HOST,
+      port : process.env.DB_PORT,
+      user : process.env.USER,
+      password : process.env.DB_PASSWORD,
+      database : process.env.DB_NAME
+    }
+  });
+}
+else{
+  db = require('knex')({
+    client: 'pg',
+    connection: {
+      connectionString: process.env.DB_HOST,
+      port: process.env.DB_PORT,
+      user: process.env.DB_USER,
+      database: process.env.DB_NAME,
+      password: process.env.DB_PASSWORD,
+      ssl: {rejectUnauthorized: false }
+    }
+  });
+}
 
-db = require('knex')({
-  client: 'pg',
-  connection: {
-    connectionString: process.env.DB_HOST,
-    port: process.env.DB_PORT,
-    user: process.env.DB_USER,
-    database: process.env.DB_NAME,
-    password: process.env.DB_PASSWORD,
-    ssl: {rejectUnauthorized: false }
-  }
-});
 
 app.use(session({
   secret: 'keyboard cat',
