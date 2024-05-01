@@ -11,12 +11,12 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cookieParser());
 
-app.use(
-  // cors({
-  //   credentials: true,
-  //   origin: "https://react-nutri.onrender.com/"
-  // })
-);
+// app.use(
+//   // cors({
+//   //   credentials: true,
+//   //   origin: "https://react-nutri.onrender.com/"
+//   // })
+// );
 
 
 let db;
