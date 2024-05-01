@@ -15,7 +15,7 @@ app.use(cookieParser());
 app.use(
   cors({
     credentials: true,
-    origin: "https://react-nutri.onrender.com"
+    origin: "http://localhost:3000"
   })
 );
 
@@ -73,9 +73,7 @@ const checkSignIn = (req, res, next) => {
     })
   }
 }
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
+
 
 app.post("/login", (req, res) => {
   const {username, password} = req.body;
@@ -879,10 +877,9 @@ app.get("/calories/user/:userId/meals/breakdown", (req, res) => {
 });
 
 
-
-
-
-
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+});
 
 app.listen(PORT, () => {
     console.log("App is running on port ", PORT);
