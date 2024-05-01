@@ -12,10 +12,10 @@ app.use(bodyParser.json());
 app.use(cookieParser());
 
 app.use(
-  cors({
-    credentials: true,
-    origin: "https://react-nutri.onrender.com/"
-  })
+  // cors({
+  //   credentials: true,
+  //   origin: "https://react-nutri.onrender.com/"
+  // })
 );
 
 
