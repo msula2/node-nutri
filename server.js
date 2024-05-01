@@ -17,7 +17,7 @@ console.log("process.env.TEST: ",process.env.TEST)
 app.use(
   cors({
     credentials: true,
-    origin: process.env.TEST == false ? "https://react-nutri.onrender.com" : "http://localhost:3000"
+    origin: "https://react-nutri.onrender.com"
   })
 );
 
