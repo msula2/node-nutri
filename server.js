@@ -20,6 +20,7 @@ app.use(
   })
 );
 let db;
+
 if (process.env.NODE_ENV === 'development'){
   db = require('knex')({
     client: 'pg',
@@ -27,7 +28,7 @@ if (process.env.NODE_ENV === 'development'){
     connection: {
       host : process.env.DB_HOST,
       port : process.env.DB_PORT,
-      user : process.env.USER,
+      user : process.env.DB_USER,
       password : process.env.DB_PASSWORD,
       database : process.env.DB_NAME
     }
@@ -53,7 +54,7 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    maxAge: 6000000 
+    maxAge: 1200000 
   },
   store: new session.MemoryStore()
 }));
@@ -104,6 +105,18 @@ app.post("/login", (req, res) => {
       error: "Error establishing a database connection"
     })
   });  
+});
+
+app.get("/logout", (req, res) => {
+  req.session.destroy(err => {
+      if (err) {
+          console.error("Error destroying session:", err);
+          res.status(500).json({ result: "failed", error: "Error destroying session" });
+      } else {
+          res.clearCookie("sessionID");
+          res.json({ result: "success" });
+      }
+  });
 });
 
 app.post("/register", (req, res) => {
