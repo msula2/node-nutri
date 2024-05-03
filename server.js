@@ -228,6 +228,11 @@ app.get("/user", checkSignIn, (req, res) => {
   }
 });
 
+/**
+ * Deletes a recipe from the database
+ * @param {string} title - The title of the recipe to delete
+ * @returns {string} The result of deleting the recipe
+ */
 app.delete("/recipe/delete", (req, res) => {
   const { title } = req.body;
   db('recipes')
@@ -255,6 +260,14 @@ app.delete("/recipe/delete", (req, res) => {
     });  
 });
 
+/**
+ * Edits a recipe from the database
+ * @param {string} title - The title of the recipe to edit
+ * @param {string} description - The description of the recipe to edit
+ * @param {string} ingredients - The ingredients of the recipe to edit
+ * @param {string} instructions - The instructions of the recipe to edit
+ * @returns {string} The result of editing the recipe
+ */
 app.put("/recipe", (req, res) => {
   const { title, description = "", ingredients, instructions } = req.body;
   db('recipes')
@@ -286,7 +299,14 @@ app.put("/recipe", (req, res) => {
     });  
 });
 
-
+/**
+ * Adds a recipe to the database
+ * @param {string} title - The title of the recipe to add
+ * @param {string} description - The description of the recipe to add
+ * @param {string} ingredients - The ingredients of the recipe to add
+ * @param {string} instructions - The instructions of the recipe to add
+ * @returns {string} The result of adding the recipe
+ */
 app.post("/recipe/add", (req, res) => {
   const { title, description, ingredients, instructions } = req.body;
 
@@ -331,7 +351,11 @@ app.post("/recipe/add", (req, res) => {
 });
 
 
-
+/**
+ * Fetches a recipe from the database
+ * @param {string} title - The title of the recipe to fetch
+ * @returns {json} The recipe data that matches up with the title
+ */
 app.get("/recipes/:title/get", (req, res) => {
   let title = req.params.title;
   db('recipes')
