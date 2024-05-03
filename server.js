@@ -377,7 +377,6 @@ app.get("/recipes/:recipeId/calories/get", (req, res) => {
   .join('food_groups', 'food_items.foodgroup', 'food_groups.value')
   .where('items_recipes.recipe_id', recipeId)
   .then((response) => {
-    console.log(response);
     if (response.length !== 0) {
       // Define an array to store the breakdown for each item
       const breakdowns = [];
@@ -952,6 +951,145 @@ app.get("/calories/user/:userId/meals/breakdown", (req, res) => {
       });
     });
 });
+
+// app.get("/calories/user/:userId/meals/calories", (req, res) => {
+//   const userId = req.params.userId;
+
+//   // Modify the query to specify the table name for the meal name column to resolve the ambiguity
+//   db('meals')
+//     .select('meals.name', db.raw('SUM(food_groups.calories) AS total_calories'))
+//     .join('meal_ingredients', 'meals.id', 'meal_ingredients.meal_id')
+//     .join('food_items', 'meal_ingredients.food_item_value', 'food_items.value')
+//     .join('food_groups', 'food_items.foodgroup', 'food_groups.value')
+//     .where('meals.userid', userId)
+//     .groupBy('meals.name')
+//     .then((caloriesConsumed) => {
+//       res.json({
+//         result: "success",
+//         calories_consumed: caloriesConsumed
+//       });
+//     })
+//     .catch((err) => {
+//       console.error(err);
+//       res.status(400).json({
+//         result: "failed",
+//         error: "Error retrieving consumed calories per meal"
+//       });
+//     });
+// });
+
+
+// app.get("/user/:id/diet/details", (req, res) => {
+//   const id = req.params.id;
+
+//   db.select('activity_label', 'goal', 'bmr', 'tdee')
+//   .from('users')
+//   .where('id', id)
+//   .then((response) => {
+//     if (response.length !== 0) {
+//       // User with the given ID exists
+//       const diet = response[0]; // Assuming only one user will match the ID
+//       res.json({
+//         goal: {
+//           activity: diet.activity_label,
+//           action: diet.goal,
+//           bmr: diet.bmr,
+//           tdee: diet.tdee,
+//         }
+        
+//       });
+//     } else {
+//       // No user exists with the given ID
+//       res.status(404).json({
+//         result: "error",
+//         message: "User not found"
+//       });
+//     }
+//   })
+//   .catch(err => {
+//     console.error(err);
+//     res.status(500).json({
+//       result: "error",
+//       message: "Internal server error"
+//     });
+//   });
+
+// });
+
+app.get("/user/:id/diet/details", (req, res) => {
+  const userId = req.params.id;
+
+  // Query to retrieve diet details for the user
+  const dietQuery = db.select('activity_label', 'goal', 'bmr', 'tdee')
+    .from('users')
+    .where('id', userId)
+    .then((response) => {
+      if (response.length !== 0) {
+        // User with the given ID exists
+        const diet = response[0]; // Assuming only one user will match the ID
+        return {
+
+            activity: diet.activity_label,
+            action: diet.goal,
+            bmr: diet.bmr.toString(),
+            tdee: diet.tdee.toFixed(0).toString(),
+
+        };
+      } else {
+        // No user exists with the given ID
+        throw new Error("User not found");
+      }
+    })
+    .catch(err => {
+      console.error(err);
+      throw err;
+    });
+
+  // Query to retrieve calorie consumption per meal for the user
+  const calorieConsumptionQuery = db('meals')
+    .select('meals.name', db.raw('SUM(food_groups.calories) AS total_calories'))
+    .join('meal_ingredients', 'meals.id', 'meal_ingredients.meal_id')
+    .join('food_items', 'meal_ingredients.food_item_value', 'food_items.value')
+    .join('food_groups', 'food_items.foodgroup', 'food_groups.value')
+    .where('meals.userid', userId)
+    .groupBy('meals.name')
+    .then((caloriesConsumed) => {
+      const totalCalories = caloriesConsumed.reduce((acc, meal) => acc + parseFloat(meal.total_calories), 0);
+      return {
+        meals: caloriesConsumed,
+        tdee: totalCalories.toFixed(0).toString()
+      };
+    })
+    .catch((err) => {
+      console.error(err);
+      throw err;
+    });
+
+  // Execute both queries concurrently
+  Promise.all([dietQuery, calorieConsumptionQuery])
+    .then(([dietDetails, calorieDetails]) => {
+      res.json({
+        result: "success",
+        diet: {
+          goal: dietDetails,
+          current: calorieDetails
+        }
+       
+      });
+    })
+    .catch((err) => {
+      res.status(404).json({
+        result: "error",
+        message: err.message || "Internal server error"
+      });
+    });
+});
+
+
+
+
+
+
 
 
 app.listen(PORT, () => {
