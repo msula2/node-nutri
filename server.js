@@ -7,12 +7,16 @@ const path = require('path');
 require('dotenv').config();
 const PORT = process.env.PORT || 3001 ;
 
+// Initialize the Express application
 const app = express();
 
+// Use body-parser to parse JSON request bodies
 app.use(bodyParser.json());
+
+// Use cookie-parser to parse cookies
 app.use(cookieParser());
 
-
+// Configure CORS policy based on the environment
 app.use(
   cors({
     credentials: true,
@@ -21,6 +25,7 @@ app.use(
 );
 let db;
 
+// Connect to the database depending on the environment
 if (process.env.NODE_ENV === 'development'){
   db = require('knex')({
     client: 'pg',
@@ -48,7 +53,7 @@ else{
   });
 }
 
-
+// Configure session management
 app.use(session({
   secret: 'keyboard cat',
   resave: false,
@@ -59,7 +64,12 @@ app.use(session({
   store: new session.MemoryStore()
 }));
 
-
+/**
+ * Middleware to check if the user is signed in
+ * @param {Object} req - The request object
+ * @param {Object} res - The response object
+ * @param {Function} next - The next middleware function
+ */
 const checkSignIn = (req, res, next) => {
   if(req.session.user){
     console.log("User is on the session");
@@ -73,6 +83,7 @@ const checkSignIn = (req, res, next) => {
   }
 }
 
+// Login endpoint to authenticate a user
 app.post("/login", (req, res) => {
   const {username, password} = req.body;
   console.log("Username:", username, "Password: ", password);
@@ -107,6 +118,7 @@ app.post("/login", (req, res) => {
   });  
 });
 
+// Logout endpoint to end the user session
 app.get("/logout", (req, res) => {
   req.session.destroy(err => {
       if (err) {
@@ -119,6 +131,7 @@ app.get("/logout", (req, res) => {
   });
 });
 
+// Register endpoint to create a new user account
 app.post("/register", (req, res) => {
   const { username, password } = req.body;
   db('users')
@@ -149,6 +162,7 @@ app.post("/register", (req, res) => {
     });  
 });
 
+// Endpoint to add a diet plan for a user
 app.post("/diet/user/:id/add", (req, res) => {
   let { age, gender, weight, height, activity, goal } = req.body;
   let id = req.params.id;
@@ -214,7 +228,7 @@ app.post("/diet/user/:id/add", (req, res) => {
   });
 });
 
-
+// Endpoint to check user session
 app.get("/user", checkSignIn, (req, res) => {
   if(req.session.user){
     console.log("logged-in")
@@ -229,9 +243,9 @@ app.get("/user", checkSignIn, (req, res) => {
 });
 
 /**
- * Deletes a recipe from the database
+ * Endpoint to delete a recipe by title
  * @param {string} title - The title of the recipe to delete
- * @returns {string} The result of deleting the recipe
+ * @returns {Object} JSON response with the result
  */
 app.delete("/recipe/delete", (req, res) => {
   const { title } = req.body;
@@ -261,12 +275,12 @@ app.delete("/recipe/delete", (req, res) => {
 });
 
 /**
- * Edits a recipe from the database
+ * Endpoint to edit a recipe
  * @param {string} title - The title of the recipe to edit
- * @param {string} description - The description of the recipe to edit
- * @param {string} ingredients - The ingredients of the recipe to edit
- * @param {string} instructions - The instructions of the recipe to edit
- * @returns {string} The result of editing the recipe
+ * @param {string} description - The description of the recipe
+ * @param {string[]} ingredients - The list of ingredients
+ * @param {string[]} instructions - The list of instructions
+ * @returns {Object} JSON response with the result
  */
 app.put("/recipe", (req, res) => {
   const { title, description = "", ingredients, instructions } = req.body;
@@ -300,12 +314,12 @@ app.put("/recipe", (req, res) => {
 });
 
 /**
- * Adds a recipe to the database
- * @param {string} title - The title of the recipe to add
- * @param {string} description - The description of the recipe to add
- * @param {string} ingredients - The ingredients of the recipe to add
- * @param {string} instructions - The instructions of the recipe to add
- * @returns {string} The result of adding the recipe
+ * Endpoint to add a new recipe
+ * @param {string} title - The title of the new recipe
+ * @param {string} description - The description of the new recipe
+ * @param {Array<Object>} ingredients - The list of ingredients with label and serving size
+ * @param {Array<Object>} instructions - The list of instructions for the recipe
+ * @returns {Object} JSON response with the result
  */
 app.post("/recipe/add", (req, res) => {
   const { title, description, ingredients, instructions } = req.body;
@@ -352,9 +366,9 @@ app.post("/recipe/add", (req, res) => {
 
 
 /**
- * Fetches a recipe from the database
+ * Endpoint to fetch a recipe by its title
  * @param {string} title - The title of the recipe to fetch
- * @returns {json} The recipe data that matches up with the title
+ * @returns {Object} JSON response with the recipe data or an error message
  */
 app.get("/recipes/:title/get", (req, res) => {
   let title = req.params.title;
@@ -383,6 +397,11 @@ app.get("/recipes/:title/get", (req, res) => {
     });
 });
 
+/**
+ * Endpoint to fetch calorie information for a recipe by its ID
+ * @param {string} recipeId - The ID of the recipe to fetch calorie information for
+ * @returns {Object} JSON response with calorie breakdown or an error message
+ */
 app.get("/recipes/:recipeId/calories/get", (req, res) => {
   const recipeId = req.params.recipeId;
 
@@ -465,7 +484,11 @@ app.get("/recipes/:recipeId/calories/get", (req, res) => {
 });
 
 
-
+/**
+ * Endpoint to get food categories by food group
+ * @param {string} group - The food group to fetch categories for
+ * @returns {Object} JSON response with food categories or an error message
+ */
 app.get("/calories/groups/:group/categories/get", (req, res) => {
   db("food_categories")
     .where({
@@ -496,7 +519,11 @@ app.get("/calories/groups/:group/categories/get", (req, res) => {
     });
 });
 
-
+/**
+ * Endpoint to get food items by food category
+ * @param {string} category - The food category to fetch items for
+ * @returns {Object} JSON response with food items or an error message
+ */
 app.get("/calories/categories/:category/items/get", (req, res) => {
   db("food_items")
     .where({
@@ -527,6 +554,11 @@ app.get("/calories/categories/:category/items/get", (req, res) => {
     });
 });
 
+/**
+ * Endpoint to get calorie breakdown for a specific food item
+ * @param {string} item - The food item value to fetch information for
+ * @returns {Object} JSON response with food item breakdown or an error message
+ */
 app.get("/calories/items/:item/get", (req, res) => {
   db('food_items')
   .select(
@@ -592,7 +624,15 @@ app.get("/calories/items/:item/get", (req, res) => {
 
 });
 
-
+/**
+ * Endpoint to add a new meal for a specific user
+ * @param {string} user - The user ID to add the meal for
+ * @param {Object} req - The request object containing meal data
+ * @param {string} req.name - The name of the meal
+ * @param {string} req.datetime - The date and time of the meal
+ * @param {Array<Object>} req.meal_ingredients - The list of meal ingredients
+ * @returns {Object} JSON response with success or error message
+ */
 app.post("/calories/user/:user/meal/add", checkSignIn, async (req, res) => {
   const { name, datetime, meal_ingredients } = req.body;
   const user = req.params.user;
@@ -635,6 +675,12 @@ app.post("/calories/user/:user/meal/add", checkSignIn, async (req, res) => {
   }
 });
 
+/**
+ * Endpoint to delete a meal for a specific user by meal ID
+ * @param {string} user - The user ID
+ * @param {string} mealId - The meal ID to delete
+ * @returns {Object} JSON response with success or error message
+ */
 app.delete("/calories/user/:user/meal/:mealId/delete", checkSignIn, async (req, res) => {
   const mealId = req.params.mealId; 
   const user = req.params.user;
@@ -679,9 +725,11 @@ app.delete("/calories/user/:user/meal/:mealId/delete", checkSignIn, async (req, 
   }
 });
 
-
-
-
+/**
+ * Endpoint to get the breakdown of a meal by its ID
+ * @param {string} mealId - The meal ID to fetch breakdown for
+ * @returns {Object} JSON response with meal breakdown or an error message
+ */
 app.get("/calories/meals/:mealId/breakdown", (req, res) => {
   const mealId = req.params.mealId;
 
@@ -777,7 +825,11 @@ app.get("/calories/meals/:mealId/breakdown", (req, res) => {
     });
 });
 
-
+/**
+ * Endpoint to get a summary of all meals for a specific user
+ * @param {string} userId - The user ID to fetch meals for
+ * @returns {Object} JSON response with meal summary or an error message
+ */
 app.get("/calories/user/:userId/meals/summary", (req, res) => {
   const userId = req.params.userId;
 
@@ -863,8 +915,11 @@ app.get("/calories/user/:userId/meals/summary", (req, res) => {
     });
 });
 
-
-
+/**
+ * Endpoint to get a detailed breakdown of meals for a specific user
+ * @param {string} userId - The user ID to fetch meal breakdowns for
+ * @returns {Object} JSON response with meal breakdowns or an error message
+ */
 app.get("/calories/user/:userId/meals/breakdown", (req, res) => {
   const userId = req.params.userId;
 
@@ -976,7 +1031,11 @@ app.get("/calories/user/:userId/meals/breakdown", (req, res) => {
     });
 });
 
-
+/**
+ * Endpoint to fetch diet details for a specific user
+ * @param {string} userId - The user ID to fetch diet details for
+ * @returns {Object} JSON response with diet details or an error message
+ */
 app.get("/user/:id/diet/details", (req, res) => {
   const userId = req.params.id;
 
@@ -1046,13 +1105,9 @@ app.get("/user/:id/diet/details", (req, res) => {
     });
 });
 
-
-
-
-
-
-
-
+/**
+ * Starts the Express server and listens on the specified port.
+ */
 app.listen(PORT, () => {
     console.log("App is running on port ", PORT);
 });
