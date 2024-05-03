@@ -129,7 +129,7 @@ app.post("/register", (req, res) => {
         throw new Error('Username already exists');
       } else {
         return db('users')
-          .returning('*')
+          .returning('id')
           .insert({
             username: username,
             password: password
@@ -139,6 +139,7 @@ app.post("/register", (req, res) => {
     .then(response => {
       res.json({
         result: "success",
+        id: response[0].id,
         message: "Registration successful"
       });
     })
@@ -147,6 +148,72 @@ app.post("/register", (req, res) => {
       res.status(400).json({ error: err.message });
     });  
 });
+
+app.post("/diet/user/:id/add", (req, res) => {
+  let { age, gender, weight, height, activity, goal } = req.body;
+  let id = req.params.id;
+
+  let bmr = 0;
+
+  weight = weight.unit == "lb" ? weight.value / 2.2 : weight.value;
+  weight = weight.toFixed(1);
+  height = (((height.feet * 12) + height.inches)) * 2.54;
+  height = height.toFixed(1);
+
+  if (gender == "male"){
+    bmr = 66 + (13.7 * weight) + (5 * height) - (6.8 * age);
+  }
+  else{
+    
+    bmr = 655 + (9.6 * weight) + (1.8 * height) - (4.7 * age);
+  }
+
+  const tdee = bmr * activity.value;
+
+  let activity_value = activity.value;
+  let activity_label = activity.label;
+
+  db.transaction(async (trx) => {
+    try {
+      // Update the user's row in the database with the calculated values
+      await trx('users')
+        .where({ id })
+        .update({
+          age,
+          gender,
+          weight,
+          height,
+          activity_label,
+          activity_value,
+          goal,
+          bmr,
+          tdee
+        });
+  
+      // Commit the transaction
+      await trx.commit();
+  
+      res.json({
+        tdee: tdee.toFixed(0),
+        bmr: bmr.toFixed(0),
+        result: "success",
+        message: "Added diet plan successfully"
+      });
+    } catch (error) {
+      // Rollback the transaction if any error occurs
+      await trx.rollback(error);
+  
+      console.error("Error updating user:", error);
+      res.json({
+        result: "error",
+        message: "Failed to update diet plan"
+      });
+    }
+
+
+  });
+});
+
 
 app.get("/user", checkSignIn, (req, res) => {
   if(req.session.user){
@@ -889,4 +956,4 @@ app.get("/calories/user/:userId/meals/breakdown", (req, res) => {
 
 app.listen(PORT, () => {
     console.log("App is running on port ", PORT);
-})
+});
